@@ -73,5 +73,11 @@ class Lattice:
         self.distances = get_distances(self.coordinates, self.Tmat)[1:]
         self.neighbor_table, self.neighbor_pbc = get_neighbor_table(self.coordinates, self.N, self.distances, self.Tmat)
 
-
-
+    def get_neighbor_pairs(self, distance_index=2):
+        """
+        :param distance_index: distance between neighbors
+        :return: list of all site pairs the specified distance apart
+        """
+        neighbor_dist = np.array([neigh[distance_index] for neigh in self.neighbor_table])
+        tpl_list = [(i, j) for i in range(len(neighbor_dist)) for j in neighbor_dist[i]]
+        return tpl_list
