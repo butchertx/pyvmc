@@ -78,6 +78,14 @@ class Lattice:
         :param distance_index: distance between neighbors
         :return: list of all site pairs the specified distance apart
         """
-        neighbor_dist = np.array([neigh[distance_index] for neigh in self.neighbor_table])
+        neighbor_dist = self.get_neighbor_list(distance_index) # np.array([neigh[distance_index] for neigh in self.neighbor_table])
         tpl_list = [(i, j) for i in range(len(neighbor_dist)) for j in neighbor_dist[i]]
         return tpl_list
+
+    def get_neighbor_list(self, distance_index=2):
+        """
+        get list of lists of neighbors at distance "distance_index"
+        :param distance_index: distance between neighbors
+        :return: np.array: [ [n1, n2, n3...], [m1, m2, m3,...]...] where row = site index, col = neighbor index
+        """
+        return np.array([neigh[distance_index] for neigh in self.neighbor_table])

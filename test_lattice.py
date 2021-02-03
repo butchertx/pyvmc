@@ -1,6 +1,12 @@
 import lattice
 import numpy as np
 
+
+def test_neighbor_list():
+    lat = lattice.Lattice('triangle', 3, 3, unit_cell_mult=1)
+    neighbor_list = lat.get_neighbor_list(distance_index=0)
+
+
 origin = np.array([0,0])
 a1 = np.array([1,0])
 a2 = np.array([0,1])
