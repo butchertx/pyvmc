@@ -8,7 +8,7 @@ def test_neighbor_list():
 
 
 origin = np.array([0,0])
-a1 = np.array([1,0])
+a1 = np.array([1j,0])
 a2 = np.array([0,1])
 Lx = 3
 Ly = 4

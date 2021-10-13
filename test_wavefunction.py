@@ -1,6 +1,7 @@
 import lattice
 import wavefunction
 import numpy as np
+np.set_printoptions(precision=3, suppress=True, linewidth=200)
 
 
 LAT_1 = lattice.Lattice('triangle', 3, 3, unit_cell_mult=1)
@@ -22,6 +23,49 @@ def exchange3(site_triple, configuration):
     return [{'site': site_triple[0], 'old_spin': configuration[site_triple[0]], 'new_spin': configuration[site_triple[2]]},
             {'site': site_triple[1], 'old_spin': configuration[site_triple[1]], 'new_spin': configuration[site_triple[0]]},
             {'site': site_triple[2], 'old_spin': configuration[site_triple[2]], 'new_spin': configuration[site_triple[1]]}]
+
+
+def test_product_state():
+    directors_u = np.array([[1, 0, 0, 0, 1, 0, 0, 0, 1],
+                            [0, 1, 0, 0, 0, 1, 1, 0, 0],
+                            [0, 0, 1, 1, 0, 0, 0, 1, 0]])
+    directors_v = np.zeros((3, 9))
+    # print(directors_u)
+    # print(directors_v)
+
+    wf_imag = wavefunction.ProductState(CONF_INIT_1, directors_v + 1j * directors_u)
+
+    test_passes = 0
+    test_total = 0
+    failed = []
+
+    # test 1: rotate the afq3 directors so they have nonzero overlaps on every site with every flavor
+    # test will pass if the rotated directors have nonzero entries in sz basis and are mutually orthogonal
+    # within a unit cell
+    d_rotate = wavefunction.euler_s1(-3.0*np.pi/4.0, np.arccos(np.sqrt(1.0/3.0)), 3.0*np.pi/4.0, directors_u, sz_basis=False)
+    print(d_rotate)
+    print(np.matmul(np.conj(d_rotate[:, :3].T), d_rotate[:, :3]))
+    print(np.abs(np.conj(d_rotate[:, :3])*d_rotate[:, :3]))
+
+    afq3 = wavefunction.ProductState(CONF_INIT_1, d_rotate)
+    c = afq3.get_conf()
+    print(c)
+    print(afq3.site_overlaps)
+    hi = 0
+    pairlist = LAT_1.get_neighbor_pairs(0)
+    for i in range(100):
+        site1, site2 = pairlist[np.random.randint(len(pairlist))]
+        fliplist = exchange2((site1, site2), c)
+        pop = afq3.psi_over_psi(fliplist)
+        print(pop)
+        if np.real(pop) > 0:
+            hi += 1
+        afq3.update(fliplist)
+        # print(afq3.site_overlaps)
+
+    print(hi)
+
+    return test_passes, test_total, failed
 
 
 def test_uniform_state():
@@ -53,7 +97,7 @@ def test_jastrow():
 
     # test 1: Initial exp table = zeros
     test_total += 1
-    if all(jastrow._exp_table == np.zeros(9)):
+    if all(jastrow.exp_table == np.zeros(9)):
         test_passes += 1
     else:
         failed.append('_exp_table')
@@ -170,6 +214,11 @@ def test_jastrow_table():
 
 
 print('Running Wavefunction Tests...')
+
+
+print('Testing Product State...')
+passed, total, failed = test_product_state()
+print('ProductState Wavefunction Test: Passed ' + str(passed) + ' out of ' + str(total) + ' tests.  Tests Failed: ' + str(failed))
 
 print('Testing Uniform Wavefunction...')
 passed, total, failed = test_uniform_state()
