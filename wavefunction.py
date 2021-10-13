@@ -133,72 +133,6 @@ class Configuration:
         return self.sz_conf_idx(self.conf[site])
 
 
-class Wavefunction(object):
-
-    configuration = Configuration(2, 1, (1, 1))
-
-    def __init__(self, conf_init):
-        """
-        :param conf_init: kwargs for initializing the configuration
-        """
-        self.configuration = Configuration(**conf_init)
-
-    def psi_over_psi(self, flip_list):
-        raise NotImplementedError('psi_over_psi must be defined for your Wavefunction!')
-
-    def update(self, flip_list):
-        raise NotImplementedError('update must be defined for your Wavefunction!')
-
-    def get_conf(self):
-        return self.configuration.get_conf()
-
-
-class ProductState(Wavefunction):
-
-    def __init__(self, conf_init, directors):
-        """
-        Site-factorized state of directors
-        :param conf_init: kwargs for initializing the configuration
-        :param directors: numpy array of directors by site.  A director is a complex vector with 2S+1 elements
-        """
-        Wavefunction.__init__(self, conf_init)
-        assert(self.configuration.size == directors.shape[1])
-        self.directors = directors
-
-        # normalize
-        norms = np.sum(self.directors * np.conj(self.directors), 0)
-        self.directors = self.directors / np.sqrt(norms)
-        self.directors_sz = sz_director_basis(self.directors)
-        self.site_overlaps = np.array([self.directors_sz[self.configuration.get_sz_idx(site), site]
-                                       for site in range(self.configuration.size)])
-
-    def psi_over_psi(self, flip_list):
-        old_prod = np.prod([self.site_overlaps[flip['site']] for flip in flip_list])
-        new_prod = np.prod([self.directors_sz[self.configuration.sz_conf_idx(flip['new_spin']), flip['site']]
-                            for flip in flip_list])
-        return np.divide(new_prod, old_prod)
-
-    def update(self, flip_list):
-        self.configuration.update(flip_list)
-        for flip in flip_list:
-            self.site_overlaps[flip['site']] = self.directors_sz[self.configuration.get_sz_idx(flip['site']), flip['site']]
-
-
-class UniformState(Wavefunction):
-    def __init__(self, conf_init):
-        """
-        Uniform wavefunction.  Every state is equally likely (psi = 1, const.)
-        :param conf_init: kwargs for initializing the configuration
-        """
-        Wavefunction.__init__(self, conf_init)
-
-    def psi_over_psi(self, flip_list):
-        return 1.0
-
-    def update(self, flip_list):
-        self.configuration.update(flip_list)
-
-
 class JastrowFactor:
 
     couples_to = 'sz'
@@ -271,3 +205,71 @@ class JastrowTable:
     def update_tables(self, flip_list):
         for jast in self.jastrows:
             jast.update_tables(flip_list)
+
+
+class Wavefunction(object):
+
+    configuration = Configuration(2, 1, (1, 1))
+
+    def __init__(self, conf_init):
+        """
+        :param conf_init: kwargs for initializing the configuration
+        """
+        self.configuration = Configuration(**conf_init)
+
+    def psi_over_psi(self, flip_list):
+        raise NotImplementedError('psi_over_psi must be defined for your Wavefunction!')
+
+    def update(self, flip_list):
+        raise NotImplementedError('update must be defined for your Wavefunction!')
+
+    def get_conf(self):
+        return self.configuration.get_conf()
+
+
+class ProductState(Wavefunction):
+
+    def __init__(self, conf_init, directors):
+        """
+        Site-factorized state of directors
+        :param conf_init: kwargs for initializing the configuration
+        :param directors: numpy array of directors by site.  A director is a complex vector with 2S+1 elements
+        """
+        Wavefunction.__init__(self, conf_init)
+        assert(self.configuration.size == directors.shape[1])
+        self.directors = directors
+
+        # normalize
+        norms = np.sum(self.directors * np.conj(self.directors), 0)
+        self.directors = self.directors / np.sqrt(norms)
+        self.directors_sz = sz_director_basis(self.directors)
+        self.site_overlaps = np.array([self.directors_sz[self.configuration.get_sz_idx(site), site]
+                                       for site in range(self.configuration.size)])
+
+    def psi_over_psi(self, flip_list):
+        old_prod = np.prod([self.site_overlaps[flip['site']] for flip in flip_list])
+        new_prod = np.prod([self.directors_sz[self.configuration.sz_conf_idx(flip['new_spin']), flip['site']]
+                            for flip in flip_list])
+        return np.divide(new_prod, old_prod)
+
+    def update(self, flip_list):
+        self.configuration.update(flip_list)
+        for flip in flip_list:
+            self.site_overlaps[flip['site']] = self.directors_sz[self.configuration.get_sz_idx(flip['site']), flip['site']]
+
+
+class UniformState(Wavefunction):
+    def __init__(self, conf_init):
+        """
+        Uniform wavefunction.  Every state is equally likely (psi = 1, const.)
+        :param conf_init: kwargs for initializing the configuration
+        """
+        Wavefunction.__init__(self, conf_init)
+
+    def psi_over_psi(self, flip_list):
+        return 1.0
+
+    def update(self, flip_list):
+        self.configuration.update(flip_list)
+
+
