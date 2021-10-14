@@ -193,8 +193,13 @@ class JastrowTable:
 
     jastrows = []
 
-    def __init__(self, jastrow_list):
-        self.jastrows = jastrow_list
+    def __init__(self, jastrow_list=None, jastrow_kwargs_list=None):
+        if jastrow_list is not None:
+            self.jastrows = jastrow_list
+        elif jastrow_kwargs_list is not None:
+            self.jastrows = [JastrowFactor(**kwargs) for kwargs in jastrow_kwargs_list]
+        else:
+            raise RuntimeError('Must enter a valid parameter to JastrowTable()')
 
     def greedy_eval(self, configuration):
         return np.prod([jast.greedy_eval(configuration) for jast in self.jastrows])
@@ -229,11 +234,14 @@ class Wavefunction(object):
 
 class ProductState(Wavefunction):
 
-    def __init__(self, conf_init, directors):
+    jastrow_table = None
+
+    def __init__(self, conf_init, directors, jastrow_init=None):
         """
         Site-factorized state of directors
         :param conf_init: kwargs for initializing the configuration
         :param directors: numpy array of directors by site.  A director is a complex vector with 2S+1 elements
+        :param jastrow_init: kwargs for initalizing the jastrow factors
         """
         Wavefunction.__init__(self, conf_init)
         assert(self.configuration.size == directors.shape[1])
@@ -246,14 +254,27 @@ class ProductState(Wavefunction):
         self.site_overlaps = np.array([self.directors_sz[self.configuration.get_sz_idx(site), site]
                                        for site in range(self.configuration.size)])
 
+        # initalize the jastrow factors
+        if jastrow_init is not None:
+            for factor in jastrow_init:
+                if 'configuration' not in factor.keys():
+                    factor['configuration'] = self.configuration
+            self.jastrow_table = JastrowTable(jastrow_kwargs_list=jastrow_init)
+
     def psi_over_psi(self, flip_list):
         old_prod = np.prod([self.site_overlaps[flip['site']] for flip in flip_list])
         new_prod = np.prod([self.directors_sz[self.configuration.sz_conf_idx(flip['new_spin']), flip['site']]
                             for flip in flip_list])
-        return np.divide(new_prod, old_prod)
+        if self.jastrow_table is not None:
+            jastrow_ratio = self.jastrow_table.lazy_eval(flip_list)
+        else:
+            jastrow_ratio = 1.0
+
+        return jastrow_ratio * np.divide(new_prod, old_prod)
 
     def update(self, flip_list):
         self.configuration.update(flip_list)
+        self.jastrow_table.update_tables(flip_list)
         for flip in flip_list:
             self.site_overlaps[flip['site']] = self.directors_sz[self.configuration.get_sz_idx(flip['site']), flip['site']]
 

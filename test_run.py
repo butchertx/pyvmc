@@ -6,8 +6,8 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True, linewidth=200)
 
 
-UCX = 4
-UCY = 4
+UCX = 2
+UCY = 2
 
 
 def afq3_triangle(uc_x, uc_y):
@@ -89,23 +89,31 @@ def create_wavefunction(lattice_in, state_type='afq3'):
         'S2': 2,
         'num_each': (3*UCX*UCY, 3*UCX*UCY, 3*UCX*UCY)
     }
+    jastrow_init = [
+        {
+            'couples_to': 'sz',
+            'strength': 0.0,
+            'neighbors': lattice_in.get_neighbor_list(distance_index=j)
+        }
+        for j in range(2)
+    ]
     if state_type == 'afq3':
         directors_u = afq3_triangle(UCX, UCY)
         d_rotate = wavefunction.euler_s1(-3.0 * np.pi / 4.0, np.arccos(np.sqrt(1.0 / 3.0)), 3.0 * np.pi / 4.0, directors_u,
                                          sz_basis=False)
-        afq3 = wavefunction.ProductState(conf_init, d_rotate)
+        afq3 = wavefunction.ProductState(conf_init, d_rotate, jastrow_init)
         return afq3
     elif state_type == 'afq120':
         directors_u, directors_v = afm120_triangle(UCX, UCY)
         d_rotate = wavefunction.euler_s1(-3.0 * np.pi / 4.0, np.arccos(np.sqrt(1.0 / 3.0)), 3.0 * np.pi / 4.0,
                                          directors_u,
                                          sz_basis=False)
-        afq120 = wavefunction.ProductState(conf_init, d_rotate)
+        afq120 = wavefunction.ProductState(conf_init, d_rotate, jastrow_init)
         return afq120
     elif state_type == 'afm120':
         directors_u, directors_v = afm120_triangle(UCX, UCY)
         directors_d = directors_u + 1j*directors_v
-        afm120 = wavefunction.ProductState(conf_init, directors_d)
+        afm120 = wavefunction.ProductState(conf_init, directors_d, jastrow_init)
         return afm120
     else:
         print('No valid state selected')
@@ -123,7 +131,7 @@ lattice_run = create_lattice()
 wavefunction_run = create_wavefunction(lattice_run, 'afq120')
 ham_run = create_hamiltonian(lattice_run)
 
-mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=1000)
+mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=100)
 mc.add_observable(ham_run)
 results, per_site, measurements = mc.run()
 print(per_site)
