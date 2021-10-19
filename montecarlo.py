@@ -60,6 +60,6 @@ class MonteCarlo:
             for name in measurements.keys():
                 measurements[name][m] = self.observables[name].local_eval(self.wf)
 
-        averages = {name: np.mean(measurements[name])/2. for name in measurements.keys()}
-        per_site = {name: (1./2./self.wf.configuration.size) * np.mean(measurements[name]) for name in measurements.keys()}
+        averages = {name: np.mean(measurements[name]) for name in measurements.keys()}
+        per_site = {name: (1./self.wf.configuration.size) * np.mean(measurements[name]) for name in measurements.keys()}
         return averages, per_site, measurements

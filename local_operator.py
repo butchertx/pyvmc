@@ -53,7 +53,7 @@ class ThreeRingExchange(LocalOperator):
         """
         ThreeRingExchange Exchange: cyclically permute the spins on sites i,j,k (i->j->k->i)
         """
-        assert(len(site_list) == 2)
+        assert(len(site_list) == 3)
         LocalOperator.__init__(self, site_list)
 
     def off_diag(self, configuration):

@@ -1,5 +1,11 @@
 import numpy as np
 
+LATTICE_TOL = 1e-10
+
+
+def compare_position(x1, x2):
+    return (np.abs(x1-x2) < LATTICE_TOL).all()
+
 
 def get_lattice_geometry(lattice_type, lx, ly, unit_cell_mult=1):
     if lattice_type == 'triangle':
@@ -23,8 +29,9 @@ def get_translations(a1, a2, lx, ly):
     return T1[:, :, None] + T2[:, None, :]
 
 
-def shortest_distance(x2, Tmat, x1=None):
-    # calculate the shortest distance using Tmat and return the distance, T/F Lx translation, T/F Ly translation
+def get_displacement_(x2, Tmat, x1=None):
+    # get the shortest displacement vector from x1 to x2 using periodic translations
+    # return displacement vector, distance, T/F Lx translation, T/F Ly translation
     if x1 is None:
         diffs = x2[:, None, None] + Tmat
     else:
@@ -32,7 +39,20 @@ def shortest_distance(x2, Tmat, x1=None):
 
     distances = np.linalg.norm(diffs, axis=0)
     min_idx = np.unravel_index(np.argmin(distances), distances.shape)
-    return distances[min_idx], min_idx[0] != 1, min_idx[1] != 1
+    return diffs[:, min_idx[0], min_idx[1]], distances[min_idx], min_idx[0] != 1, min_idx[1] != 1
+
+
+def get_displacement(x2, Tmat, x1=None):
+    # get the shortest displacement vector from x1 to x2 using periodic translations
+    # return only the displacement
+    diff, distance, Lx_trans, Ly_trans = get_displacement_(x2, Tmat, x1=x1)
+    return diff
+
+
+def shortest_distance(x2, Tmat, x1=None):
+    # calculate the shortest distance using Tmat and return the distance, T/F Lx translation, T/F Ly translation
+    diff, distance, Lx_trans, Ly_trans = get_displacement_(x2, Tmat, x1=x1)
+    return distance, Lx_trans, Ly_trans
 
 
 def get_distances(coordinates, Tmat):
@@ -65,8 +85,40 @@ def get_neighbor_table(coordinates, N, distances, Tmat, max_dist=3):
     return neighbors, neighbor_pbc
 
 
+def get_triangle_ring_list(coordinates, neighbor_list, Tmat):
+    """
+    Algorithm: 1.  For each index site, get the list of nearest neighbors
+    2.  Select the sites that are an a1, a2 and a2-a1 translation away from the index site
+    3.  append to list of rings the two triangles made of the index site and the three neighbor sites
+    :param neighbor_list:
+    :return: list of tuples: each tuple is a ring exchange triple, ordered counterclockwise.  Two rings per site
+    """
+    a1 = np.array([1.0, 0.0])
+    a2 = np.array([0.5, 0.5 * np.sqrt(3)])
+    a2_minus_a1 = a2 - a1
+    ring_list = []
+    for site0 in np.arange(coordinates.shape[1]):
+        lower_site = None
+        diag_site = None
+        upper_site = None
+        for candidate in neighbor_list[site0, :]:
+            if compare_position(a1, get_displacement(coordinates[:, candidate], Tmat, coordinates[:, site0])):
+                lower_site = candidate
+            elif compare_position(a2, get_displacement(coordinates[:, candidate], Tmat, coordinates[:, site0])):
+                diag_site = candidate
+            elif compare_position(a2_minus_a1, get_displacement(coordinates[:, candidate], Tmat, coordinates[:, site0])):
+                upper_site = candidate
+        if (diag_site is None) or (lower_site is None) or (upper_site is None):
+            raise RuntimeError('No sites match triangle lattice displacement for ring exchange')
+
+        ring_list += [(site0, lower_site, diag_site), (site0, diag_site, upper_site)]
+
+    return ring_list
+
+
 class Lattice:
     def __init__(self, lat_type, lx, ly, unit_cell_mult=1):
+        self.lat_type = lat_type
         self.basis, self.a1, self.a2, self.coordinates = get_lattice_geometry(lat_type, lx, ly, unit_cell_mult)
         self.N = self.basis.shape[1] * lx * ly
         self.Tmat = get_translations(self.a1, self.a2, lx, ly)
@@ -89,3 +141,17 @@ class Lattice:
         :return: np.array: [ [n1, n2, n3...], [m1, m2, m3,...]...] where row = site index, col = neighbor index
         """
         return np.array([neigh[distance_index] for neigh in self.neighbor_table])
+
+
+class TriangleLattice(Lattice):
+    def __init__(self, lat_type, lx, ly, unit_cell_mult=1):
+        """
+        Triangle Lattice
+        same as Lattice with an extra ring exchange method
+        :param same input params as Lattice object
+        """
+        Lattice.__init__(self, lat_type, lx, ly, unit_cell_mult=unit_cell_mult)
+        assert (self.lat_type == 'triangle')
+
+    def get_ring_exchange_list(self):
+        return get_triangle_ring_list(self.coordinates, self.get_neighbor_list(distance_index=0), self.Tmat)

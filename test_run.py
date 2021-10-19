@@ -6,8 +6,8 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True, linewidth=200)
 
 
-UCX = 2
-UCY = 2
+UCX = 4
+UCY = 4
 
 
 def afq3_triangle(uc_x, uc_y):
@@ -80,7 +80,7 @@ def afm120_triangle(uc_x, uc_y):
 
 
 def create_lattice():
-    return lattice.Lattice('triangle', 3*UCY, 3*UCX, unit_cell_mult=1)
+    return lattice.TriangleLattice('triangle', 3*UCY, 3*UCX, unit_cell_mult=1)
 
 
 def create_wavefunction(lattice_in, state_type='afq3'):
@@ -121,17 +121,19 @@ def create_wavefunction(lattice_in, state_type='afq3'):
 
 
 def create_hamiltonian(lattice_in):
+    neighbor_pairs = list(set(map(tuple, map(sorted, lattice_in.get_neighbor_pairs(0))))) #  remove duplicate neighbor pairs
+    hermitian_conj_rings = [(sites[0], sites[2], sites[1]) for sites in lattice_in.get_ring_exchange_list()]
     H = local_operator.Hamiltonian()
-    H.add_term('J', 1.0, lattice_in.get_neighbor_pairs(0))
-    # H.add_term('K', 1.0, lattice_in.get_neighbor_pairs(0))
+    H.add_term('J', 1.0, neighbor_pairs)
+    # H.add_term('K', 1.0, lattice_in.get_ring_exchange_list(), interaction_type=local_operator.ThreeRingExchange)
+    # H.add_term('K_prime', 1.0, hermitian_conj_rings, interaction_type=local_operator.ThreeRingExchange)
     return H
 
 
 lattice_run = create_lattice()
 wavefunction_run = create_wavefunction(lattice_run, 'afq120')
 ham_run = create_hamiltonian(lattice_run)
-
-mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=100)
+mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=5000)
 mc.add_observable(ham_run)
 results, per_site, measurements = mc.run()
 print(per_site)
