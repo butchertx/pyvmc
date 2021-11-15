@@ -6,8 +6,8 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True, linewidth=200)
 
 
-UCX = 4
-UCY = 4
+UCX = 2
+UCY = 2
 
 
 def afq3_triangle(uc_x, uc_y):
@@ -95,8 +95,20 @@ def create_wavefunction(lattice_in, state_type='afq3'):
             'strength': 0.0,
             'neighbors': lattice_in.get_neighbor_list(distance_index=j)
         }
-        for j in range(2)
+        for j in range(1)
     ]
+    # jastrow_init = [
+    #     {
+    #         'couples_to': 'sz',
+    #         'strength': -0.2,
+    #         'neighbors': lattice_in.get_neighbor_list(distance_index=0)
+    #     },
+    #     {
+    #         'couples_to': 'sz',
+    #         'strength': 0.1,
+    #         'neighbors': lattice_in.get_neighbor_list(distance_index=1)
+    #     }
+    # ]
     if state_type == 'afq3':
         directors_u = afq3_triangle(UCX, UCY)
         d_rotate = wavefunction.euler_s1(-3.0 * np.pi / 4.0, np.arccos(np.sqrt(1.0 / 3.0)), 3.0 * np.pi / 4.0, directors_u,
@@ -130,10 +142,11 @@ def create_hamiltonian(lattice_in):
     return H
 
 
-lattice_run = create_lattice()
-wavefunction_run = create_wavefunction(lattice_run, 'afq120')
-ham_run = create_hamiltonian(lattice_run)
-mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=5000)
-mc.add_observable(ham_run)
-results, per_site, measurements = mc.run()
-print(per_site)
+if __name__ == '__main__':
+    lattice_run = create_lattice()
+    wavefunction_run = create_wavefunction(lattice_run, 'afq120')
+    ham_run = create_hamiltonian(lattice_run)
+    mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=1000)
+    mc.add_observable(ham_run)
+    results, per_site, measurements = mc.run()
+    print(per_site)

@@ -13,7 +13,7 @@ def reorder_from_idx(idx, a):
 
 
 class MonteCarlo:
-    def __init__(self, wf, neighbor_list, steps_per_measure=10, measures=1000):
+    def __init__(self, wf, neighbor_list, steps_per_measure=10, measures=1000, throwaway=100):
         '''
         :param wf: Wavefunction
         :param neighbor_list: dictionary with lists of allowed site permutations.  Should come from Lattice.  For example, list of nn pairs
@@ -22,6 +22,7 @@ class MonteCarlo:
         self.wf = wf
         self.steps_per_measure = steps_per_measure
         self.measures = measures
+        self.throwaway = throwaway
         self.neighbor_list = neighbor_list
         self.observables = {}
 
@@ -60,6 +61,70 @@ class MonteCarlo:
             for name in measurements.keys():
                 measurements[name][m] = self.observables[name].local_eval(self.wf)
 
-        averages = {name: np.mean(measurements[name]) for name in measurements.keys()}
-        per_site = {name: (1./self.wf.configuration.size) * np.mean(measurements[name]) for name in measurements.keys()}
+        averages = {name: np.mean(measurements[name][self.throwaway:]) for name in measurements.keys()}
+        per_site = {name: (1./self.wf.configuration.size) * np.mean(measurements[name][self.throwaway:]) for name in measurements.keys()}
+        return averages, per_site, measurements
+
+
+class StochasticReconfiguration:
+    def __init__(self, bins=10, measures_per_bin=100, timestep=1.0):
+        self.bins = bins
+        self.measures_per_bin = measures_per_bin
+        self.timestep = timestep
+
+
+class VariationalMonteCarlo(MonteCarlo):
+    def __init__(self, wf, neighbor_list, mc_kwargs=None, sr_object=None):
+        """
+        MonteCarlo class for interfacing with Stochastic Reconfiguration
+        :param wf: wavefunction to be passed to the MonteCarlo parent
+        :param neighbor_list: list of neighbors to be passed to parent
+        :param mc_kwargs: kwargs for MonteCarlo object
+        """
+        if mc_kwargs is not None:
+            MonteCarlo.__init__(self, wf, neighbor_list, **mc_kwargs)
+        else:
+            MonteCarlo.__init__(self, wf, neighbor_list)
+
+        if sr_object is None:
+            self.SR = StochasticReconfiguration()
+        else:
+            self.SR = sr_object
+
+    def run_sr_iteration(self):
+        measurements = {name: (0. + 0.j) * np.ones(self.SR.measures_per_bin) for name in self.observables}
+        for m in range(self.SR.measures_per_bin):
+            for s in range(self.steps_per_measure):
+                self.step()
+
+            for name in measurements.keys():
+                measurements[name][m] = self.observables[name].local_eval(self.wf)
+                """
+                Insert code for calculating O_k operator values
+                Create a function within Wavefunction that calculates d/d(alpha) ln psi and call it here
+                """
+
+        try:
+            local_energies = measurements['Hamiltonian']
+        except KeyError:
+            print('Hamiltonian must be defined and named in order to use the Variational MonteCarlo!')
+            raise NameError('Hamiltonian')
+
+        """
+        Insert code for calculating f_k, s_kk', solving for d(alpha) and updating wavefunction parameters
+        SR object should keep and/or output to file all of the data it uses (energies, param values, etc.)
+        """
+        return measurements
+
+    def run(self):
+        measurements = {name: (0. + 0.j) * np.ones(self.SR.bins * self.SR.measures_per_bin) for name in self.observables}
+        for sri in range(self.SR.bins):
+            print('SR Iteration ' + str(sri+1) + ' out of ' + str(self.SR.bins))
+            m_iteration = self.run_sr_iteration()
+            for name in self.observables:
+                measurements[name][sri*len(m_iteration[name]):(sri+1)*len(m_iteration[name])] = m_iteration[name]
+
+        averages = {name: np.mean(measurements[name][self.throwaway:]) for name in measurements.keys()}
+        per_site = {name: (1. / self.wf.configuration.size) * np.mean(measurements[name][self.throwaway:]) for name in
+                    measurements.keys()}
         return averages, per_site, measurements

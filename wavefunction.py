@@ -188,6 +188,13 @@ class JastrowFactor:
         for idx in range(len(self.neighbor_table)):
             self.exp_table[idx] += np.sum(update_list[self.neighbor_table[idx]])
 
+    def calculate_log_derivative(self):
+        """
+        Insert code here.
+        :return: the logarithmic derivative of this Jastrow factor
+        """
+        return 1.0
+
 
 class JastrowTable:
 
@@ -211,6 +218,13 @@ class JastrowTable:
         for jast in self.jastrows:
             jast.update_tables(flip_list)
 
+    def calculate_log_derivative(self):
+        """
+        INSERT CODE HERE.  Easiest way is probably as above, by adding a similar function to JastrowFactor and returning an array
+        :return: logarithmic derivative of the Jastrow table (product of individual Jastrow factors)
+        """
+        return np.ones(1)
+
 
 class Wavefunction(object):
 
@@ -230,6 +244,18 @@ class Wavefunction(object):
 
     def get_conf(self):
         return self.configuration.get_conf()
+
+    def calculate_log_derivative(self):
+        """
+        For a variational wavefunction, calculate the logarithmic derivative at the current configuration
+        with respect to the variational parameters
+        :return: numpy array with the derivative of parameter k at index k.  Return 1 at index 0 (by definition
+        of the SR algorithm, the 0th variational parameter corresponds to the identity operator)
+        """
+        return np.ones(1)
+
+    def update_parameters(self):
+        raise NotImplementedError('update_parameters must be defined for your Wavefunction to be variational!')
 
 
 class ProductState(Wavefunction):
@@ -277,6 +303,14 @@ class ProductState(Wavefunction):
         self.jastrow_table.update_tables(flip_list)
         for flip in flip_list:
             self.site_overlaps[flip['site']] = self.directors_sz[self.configuration.get_sz_idx(flip['site']), flip['site']]
+
+    def calculate_log_derivative(self):
+        """
+        INSERT CODE HERE.  This should call the function of the same name from the Jastrow table
+        :return: numpy array with the derivative of parameter k at index k.  Return 1 at index 0 (by definition
+        of the SR algorithm, the 0th variational parameter corresponds to the identity operator)
+        """
+        return np.ones(1)
 
 
 class UniformState(Wavefunction):
