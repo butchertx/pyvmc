@@ -139,6 +139,7 @@ class JastrowFactor:
     strength = 0.0
     neighbor_table = np.array([0.0])
     exp_table = np.array([0.0])
+    conf_sum = 0.0
 
     def __init__(self, couples_to, strength, neighbors, configuration):
         """
@@ -146,7 +147,7 @@ class JastrowFactor:
         :param couples_to: diagonal operator (sz, sz2, etc.)
         :param strength: coupling strength v
         :param neighbors: list of sites and their neighbors associated with this factor
-        :param configuration: initial configuration for setting the table
+        :param configuration: (ndarray) initial configuration for setting the table
         """
         if couples_to != 'sz':
             raise NotImplementedError('Jastrow Factor must couple to Sz!')
@@ -158,14 +159,15 @@ class JastrowFactor:
 
     def initialize_table(self, configuration):
         """
-        table of site-sums.  exp_table[i] = sum(v * sum_j O_j)
-        J = exp(exp_table[i] dot O(conf[i]))
+        table of site-sums.  exp_table[i] = sum(sum_j O_j)
+        J = exp(v * exp_table[i] dot O(conf[i]))
         """
-        self.exp_table = np.array([np.sum(self.strength * configuration[j] for j in neighborlist) for neighborlist in self.neighbor_table])
+        self.exp_table = np.array([np.sum(configuration[j] for j in neighborlist) for neighborlist in self.neighbor_table])
+        self.conf_sum = 0.5 * np.dot(self.exp_table, configuration)
 
     def greedy_eval(self, configuration):
         self.initialize_table(configuration)
-        return np.exp(0.5*np.dot(self.exp_table, configuration))
+        return np.exp(0.5*self.strength*np.dot(self.exp_table, configuration))
 
     def lazy_eval(self, flip_list):
         flip_sum = 0.0
@@ -174,7 +176,7 @@ class JastrowFactor:
             del_s = flip['new_spin'] - flip['old_spin']
             flip_sum += np.sum([self.strength * del_s * flip2['new_spin'] for flip2 in flip_list if
                                 flip2['site'] in self.neighbor_table[flip['site']]])
-            neighbor_sum += del_s * self.exp_table[flip['site']]
+            neighbor_sum += del_s * self.strength * self.exp_table[flip['site']]
 
         return np.exp(flip_sum + neighbor_sum)
 
@@ -183,17 +185,33 @@ class JastrowFactor:
         del_S = [flip['new_spin'] - flip['old_spin'] for flip in flip_list]
         update_list = np.zeros(len(self.neighbor_table))
         for flipsite, dels in zip(flip_sites, del_S):
-            update_list[flipsite] = self.strength * dels
+            update_list[flipsite] = dels
 
         for idx in range(len(self.neighbor_table)):
             self.exp_table[idx] += np.sum(update_list[self.neighbor_table[idx]])
 
+        flip_sum = 0.0
+        neighbor_sum = 0.0
+        for flip in flip_list:
+            del_s = flip['new_spin'] - flip['old_spin']
+            flip_sum += np.sum([del_s * flip2['new_spin'] for flip2 in flip_list if
+                                flip2['site'] in self.neighbor_table[flip['site']]])
+            neighbor_sum += del_s * self.exp_table[flip['site']]
+
+        self.conf_sum = flip_sum + neighbor_sum
+
+
     def calculate_log_derivative(self):
         """
-        Insert code here.
         :return: the logarithmic derivative of this Jastrow factor
         """
-        return 1.0
+        return self.conf_sum
+
+    def get_param(self):
+        return self.strength
+
+    def set_param(self, new_param):
+        self.strength = new_param
 
 
 class JastrowTable:
@@ -220,10 +238,16 @@ class JastrowTable:
 
     def calculate_log_derivative(self):
         """
-        INSERT CODE HERE.  Easiest way is probably as above, by adding a similar function to JastrowFactor and returning an array
-        :return: logarithmic derivative of the Jastrow table (product of individual Jastrow factors)
+        :return: logarithmic derivative of the Jastrow table (array containing one value for each variational param)
         """
-        return np.ones(1)
+        return np.array([jast.calculate_log_derivative() for jast in self.jastrows])
+
+    def get_params(self):
+        return np.array([jast.get_param() for jast in self.jastrows])
+
+    def set_params(self, new_params):
+        for param, jast in zip(new_params, self.jastrows):
+            jast.set_param(param)
 
 
 class Wavefunction(object):
@@ -284,7 +308,7 @@ class ProductState(Wavefunction):
         if jastrow_init is not None:
             for factor in jastrow_init:
                 if 'configuration' not in factor.keys():
-                    factor['configuration'] = self.configuration
+                    factor['configuration'] = self.configuration.get_conf()
             self.jastrow_table = JastrowTable(jastrow_kwargs_list=jastrow_init)
 
     def psi_over_psi(self, flip_list):
@@ -300,7 +324,9 @@ class ProductState(Wavefunction):
 
     def update(self, flip_list):
         self.configuration.update(flip_list)
-        self.jastrow_table.update_tables(flip_list)
+        if self.jastrow_table is not None:
+            self.jastrow_table.update_tables(flip_list)
+
         for flip in flip_list:
             self.site_overlaps[flip['site']] = self.directors_sz[self.configuration.get_sz_idx(flip['site']), flip['site']]
 
@@ -310,7 +336,13 @@ class ProductState(Wavefunction):
         :return: numpy array with the derivative of parameter k at index k.  Return 1 at index 0 (by definition
         of the SR algorithm, the 0th variational parameter corresponds to the identity operator)
         """
-        return np.ones(1)
+        return np.concatenate(([1.0], self.jastrow_table.calculate_log_derivative()))
+
+    def get_params(self):
+        return self.jastrow_table.get_params()
+
+    def update_parameters(self, new_params):
+        self.jastrow_table.set_params(new_params)
 
 
 class UniformState(Wavefunction):

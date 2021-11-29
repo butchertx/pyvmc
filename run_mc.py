@@ -95,7 +95,7 @@ def create_wavefunction(lattice_in, state_type='afq3'):
             'strength': 0.0,
             'neighbors': lattice_in.get_neighbor_list(distance_index=j)
         }
-        for j in range(1)
+        for j in range(2)
     ]
     # jastrow_init = [
     #     {
@@ -136,9 +136,9 @@ def create_hamiltonian(lattice_in):
     neighbor_pairs = list(set(map(tuple, map(sorted, lattice_in.get_neighbor_pairs(0))))) #  remove duplicate neighbor pairs
     hermitian_conj_rings = [(sites[0], sites[2], sites[1]) for sites in lattice_in.get_ring_exchange_list()]
     H = local_operator.Hamiltonian()
-    H.add_term('J', 1.0, neighbor_pairs)
-    # H.add_term('K', 1.0, lattice_in.get_ring_exchange_list(), interaction_type=local_operator.ThreeRingExchange)
-    # H.add_term('K_prime', 1.0, hermitian_conj_rings, interaction_type=local_operator.ThreeRingExchange)
+    # H.add_term('J', 1.0, neighbor_pairs)
+    H.add_term('K', 1.0, lattice_in.get_ring_exchange_list(), interaction_type=local_operator.ThreeRingExchange)
+    H.add_term('K_prime', 1.0, hermitian_conj_rings, interaction_type=local_operator.ThreeRingExchange)
     return H
 
 

@@ -67,10 +67,20 @@ class MonteCarlo:
 
 
 class StochasticReconfiguration:
-    def __init__(self, bins=10, measures_per_bin=100, timestep=1.0):
+
+    def __init__(self, bins=10, measures_per_bin=100, timestep=0.1):
         self.bins = bins
         self.measures_per_bin = measures_per_bin
         self.timestep = timestep
+        self.params_bins = []
+        self.energy_bins = []
+
+    def save_bin(self, param_vals, energy_avg):
+        if len(self.params_bins) == 0:
+            self.params_bins = [param_vals]
+        else:
+            self.params_bins = np.concatenate((self.params_bins, [param_vals]))
+        self.energy_bins = np.concatenate((self.energy_bins, [energy_avg]))
 
 
 class VariationalMonteCarlo(MonteCarlo):
@@ -92,28 +102,37 @@ class VariationalMonteCarlo(MonteCarlo):
             self.SR = sr_object
 
     def run_sr_iteration(self):
-        measurements = {name: (0. + 0.j) * np.ones(self.SR.measures_per_bin) for name in self.observables}
+        measurements = {name: np.zeros((self.SR.measures_per_bin,), dtype=np.complex64) for name in self.observables}
+        ok_measurements = np.zeros((self.SR.measures_per_bin, self.wf.calculate_log_derivative().size), dtype=np.complex64)
         for m in range(self.SR.measures_per_bin):
             for s in range(self.steps_per_measure):
                 self.step()
 
             for name in measurements.keys():
                 measurements[name][m] = self.observables[name].local_eval(self.wf)
-                """
-                Insert code for calculating O_k operator values
-                Create a function within Wavefunction that calculates d/d(alpha) ln psi and call it here
-                """
+
+            ok_measurements[m, :] = self.wf.calculate_log_derivative()
 
         try:
-            local_energies = measurements['Hamiltonian']
+            local_energies = np.real(measurements['Hamiltonian'])
         except KeyError:
             print('Hamiltonian must be defined and named in order to use the Variational MonteCarlo!')
             raise NameError('Hamiltonian')
 
-        """
-        Insert code for calculating f_k, s_kk', solving for d(alpha) and updating wavefunction parameters
-        SR object should keep and/or output to file all of the data it uses (energies, param values, etc.)
-        """
+        ok_mean = np.mean(ok_measurements, axis=0)
+        e_mean = np.mean(local_energies)
+        sjk = np.tensordot(np.matrix(ok_measurements).H, ok_measurements, axes=1) / self.SR.measures_per_bin
+        sjk0 = np.outer(sjk[0, :], sjk[0, :])
+        sjk = sjk - sjk0
+        fk = ok_mean * e_mean - np.tensordot(np.matrix(ok_measurements).H, local_energies, axes=1) / self.SR.measures_per_bin
+        del_alpha = np.linalg.solve(sjk[1:, 1:], fk[1:])
+        old_params = self.wf.get_params()
+        new_params = old_params + self.SR.timestep * np.real(del_alpha)
+        self.SR.save_bin(old_params, e_mean)
+        self.wf.update_parameters(new_params)
+        print('Update Parameters')
+        print('Old Parameters:', old_params)
+        print('New Parameters:', new_params)
         return measurements
 
     def run(self):
@@ -121,8 +140,10 @@ class VariationalMonteCarlo(MonteCarlo):
         for sri in range(self.SR.bins):
             print('SR Iteration ' + str(sri+1) + ' out of ' + str(self.SR.bins))
             m_iteration = self.run_sr_iteration()
+            print('SR bin measurements:')
             for name in self.observables:
                 measurements[name][sri*len(m_iteration[name]):(sri+1)*len(m_iteration[name])] = m_iteration[name]
+                print(name + ' = ' + str(np.mean(m_iteration[name])))
 
         averages = {name: np.mean(measurements[name][self.throwaway:]) for name in measurements.keys()}
         per_site = {name: (1. / self.wf.configuration.size) * np.mean(measurements[name][self.throwaway:]) for name in

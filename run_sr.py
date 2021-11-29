@@ -12,14 +12,16 @@ UCY = 2
 
 
 def default_sr():
-    pass
+    return montecarlo.StochasticReconfiguration(bins=100, measures_per_bin=100, timestep=0.1)
 
 
 if __name__ == '__main__':
     lattice_run = run_mc.create_lattice()
     wavefunction_run = run_mc.create_wavefunction(lattice_run, 'afq120')
     ham_run = run_mc.create_hamiltonian(lattice_run)
-    mc = montecarlo.VariationalMonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0)) # , mc_kwargs={steps_per_measure=10, measures=1000, throwaway=100})
+    mc = montecarlo.VariationalMonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), sr_object=default_sr())
     mc.add_observable(ham_run)
     results, per_site, measurements = mc.run()
     print(per_site)
+    print(mc.SR.params_bins)
+    print(mc.SR.energy_bins)
