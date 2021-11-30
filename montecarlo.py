@@ -128,7 +128,7 @@ class VariationalMonteCarlo(MonteCarlo):
         del_alpha = np.linalg.solve(sjk[1:, 1:], fk[1:])
         old_params = self.wf.get_params()
         new_params = old_params + self.SR.timestep * np.real(del_alpha)
-        self.SR.save_bin(old_params, e_mean)
+        self.SR.save_bin(old_params, e_mean / self.wf.configuration.size)
         self.wf.update_parameters(new_params)
         print('Update Parameters')
         print('Old Parameters:', old_params)
