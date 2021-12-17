@@ -13,14 +13,22 @@ def get_lattice_geometry(lattice_type, lx, ly, unit_cell_mult=1):
         basis = x[:, None] * np.arange(unit_cell_mult)[None, :]
         a1 = x*unit_cell_mult
         a2 = np.array([0.5, 0.5*np.sqrt(3)])
-        rlist = []
-        for i in np.arange(lx):
-            for j in np.arange(ly):
-                for b in np.arange(unit_cell_mult):
-                    rlist.append(a1 * i + a2 * j + basis[:, b])
+    elif lattice_type == 'square':
+        x = np.array([1.0, 0.0])
+        basis = x[:, None] * np.arange(unit_cell_mult)[None, :]
+        a1 = x * unit_cell_mult
+        a2 = np.array([0.0, 1.0])
+    else:
+        raise NotImplementedError(f'Lattice type {lattice_type} not implemented in lattice.py')
 
-        coordinates = np.array(rlist).transpose()
-        return basis, a1, a2, coordinates
+    rlist = []
+    for i in np.arange(lx):
+        for j in np.arange(ly):
+            for b in np.arange(unit_cell_mult):
+                rlist.append(a1 * i + a2 * j + basis[:, b])
+
+    coordinates = np.array(rlist).transpose()
+    return basis, a1, a2, coordinates
 
 
 def get_translations(a1, a2, lx, ly):

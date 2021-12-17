@@ -7,6 +7,21 @@ def exchange2(site_pair, configuration):
              {'site': site_pair[1], 'old_spin': configuration[site_pair[1]], 'new_spin': configuration[site_pair[0]]}]
 
 
+def s_plus_minus(site_pair, configuration):
+    return [{'site': site_pair[0], 'old_spin': configuration[site_pair[0]], 'new_spin': configuration[site_pair[0]]-1},
+             {'site': site_pair[1], 'old_spin': configuration[site_pair[1]], 'new_spin': configuration[site_pair[1]]+1}]
+
+
+def list_spm_smp(site_pair, configuration, spinmax):
+    fliplist_list = []
+    if configuration[site_pair[0]] > -spinmax + 0.5 and configuration[site_pair[1]] < spinmax - 0.5:
+        fliplist_list.append(s_plus_minus(site_pair, configuration))
+    if configuration[site_pair[1]] > -spinmax + 0.5 and configuration[site_pair[0]] < spinmax - 0.5:
+        fliplist_list.append(s_plus_minus((site_pair[1], site_pair[0]), configuration))
+    return fliplist_list
+
+
+
 def exchange3(site_triple, configuration):
     return [{'site': site_triple[0], 'old_spin': configuration[site_triple[0]], 'new_spin': configuration[site_triple[2]]},
             {'site': site_triple[1], 'old_spin': configuration[site_triple[1]], 'new_spin': configuration[site_triple[0]]},
@@ -32,6 +47,24 @@ class LocalOperator:
         :return: coefficient and list of Fliplist objects
         '''
         pass
+
+
+class HeisenbergExchange(LocalOperator):
+
+    def __init__(self, site_list, spinval):
+        """
+        Heisenberg Exchange: S_i cdot S_j = S_i^z S_j^z + 0.5(S_i^+S_j^- + S_i^-S_j^+)
+        """
+        assert(len(site_list) == 2)
+        LocalOperator.__init__(self, site_list)
+        self.spinval = spinval
+
+    def diag(self, configuration):
+        return self.spinval * self.spinval * configuration[self.site_list[0]] * configuration[self.site_list[1]]
+
+    def off_diag(self, configuration):
+        # TODO: update for arbitrary spin value (this is correct for S=1)
+        return list_spm_smp(self.site_list, configuration, 1), 1.0
 
 
 class BilinearExchange(LocalOperator):
