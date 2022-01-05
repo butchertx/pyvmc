@@ -51,7 +51,7 @@ class LocalOperator:
 
 class HeisenbergExchange(LocalOperator):
 
-    def __init__(self, site_list, spinval):
+    def __init__(self, site_list, spinval=1):
         """
         Heisenberg Exchange: S_i cdot S_j = S_i^z S_j^z + 0.5(S_i^+S_j^- + S_i^-S_j^+)
         """
@@ -77,7 +77,7 @@ class BilinearExchange(LocalOperator):
         LocalOperator.__init__(self, site_list)
 
     def off_diag(self, configuration):
-        return exchange2((self.site_list[0], self.site_list[1]), configuration), 1.0
+        return [exchange2((self.site_list[0], self.site_list[1]), configuration)], 1.0
 
 
 class ThreeRingExchange(LocalOperator):
@@ -90,7 +90,7 @@ class ThreeRingExchange(LocalOperator):
         LocalOperator.__init__(self, site_list)
 
     def off_diag(self, configuration):
-        return exchange3((self.site_list[0], self.site_list[1], self.site_list[2]), configuration), 1.0
+        return [exchange3((self.site_list[0], self.site_list[1], self.site_list[2]), configuration)], 1.0
 
 
 class Hamiltonian:
@@ -113,9 +113,12 @@ class Hamiltonian:
         for term in self.term_dict.keys():
             diag_terms = np.sum([op.diag(config) for op in self.term_dict[term]])
             reslist = [op.off_diag(config) for op in self.term_dict[term]]
-            off_diag_terms = np.sum([wf.psi_over_psi(flips) * coeff for flips, coeff in reslist])
-            #off_diag_terms = np.sum([wf.psi_over_psi(flips) * coeff for flips, coeff
-            #                         in [op.off_diag(config) for op in self.term_dict[term]]])
+            off_diag_terms = 0.0
+            # first iterate over terms
+            for flips, coeff in reslist:
+                # term gives a list of flips and a coeff, get the sum of the flips
+                off_diag_terms += np.sum([wf.psi_over_psi(flip_list) * coeff for flip_list in flips])
+
             result += self.coupling_dict[term] * (diag_terms + off_diag_terms)
 
         return result

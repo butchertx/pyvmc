@@ -200,7 +200,6 @@ class JastrowFactor:
 
         self.conf_sum = flip_sum + neighbor_sum
 
-
     def calculate_log_derivative(self):
         """
         :return: the logarithmic derivative of this Jastrow factor
