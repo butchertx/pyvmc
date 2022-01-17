@@ -71,7 +71,7 @@ if __name__ == '__main__':
     lattice_run = create_lattice()
     wavefunction_run = create_wavefunction(lattice_run)
     ham_run = create_hamiltonian(lattice_run)
-    mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), measures=1000)
+    mc = montecarlo.MonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), su3=False, measures=1000, throwaway=500)
     mc.add_observable(ham_run)
     results, per_site, measurements = mc.run()
     print(per_site)

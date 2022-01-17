@@ -5,6 +5,7 @@ Holding Measurement Results
 Outputting Data, Calculating Averages and Errors
 '''
 import numpy as np
+from local_operator import exchange2
 import wavefunction
 
 
@@ -13,11 +14,12 @@ def reorder_from_idx(idx, a):
 
 
 class MonteCarlo:
-    def __init__(self, wf, neighbor_list, steps_per_measure=10, measures=1000, throwaway=100):
+    def __init__(self, wf, neighbor_list, steps_per_measure=10, measures=1000, throwaway=100, su3=True):
         '''
         :param wf: Wavefunction
         :param neighbor_list: dictionary with lists of allowed site permutations.  Should come from Lattice.  For example, list of nn pairs
         :param steps_per_measure: Steps/moves between each MC measurement
+        :param su3: preserve SU(3) symmetry in updates (if false, allow spin flip updates)
         '''
         self.wf = wf
         self.steps_per_measure = steps_per_measure
@@ -25,27 +27,71 @@ class MonteCarlo:
         self.throwaway = throwaway
         self.neighbor_list = neighbor_list
         self.observables = {}
+        self.su3 = su3
 
     def add_observable(self, operator):
         self.observables[operator.name] = operator
 
-    def propose_permutation(self):
+    def propose_permutation(self, num_sites=2):
         perm = self.neighbor_list[np.random.randint(len(self.neighbor_list))]
         return [{'site': i, 'old_spin': self.wf.configuration[i], 'new_spin': self.wf.configuration[j]} for i, j in zip(perm, reorder_from_idx(1, perm))]
 
-    def propose_flip(self, num_sites):
-        pass
+    def propose_flip(self, num_sites=2):
+        # Algorithm is defined in Appendix C of Bieri et al. PRB 86, 224409 (2012)
+        # only works for S = 1
+        # select two random sites
+        site_pair = (0, 0)
+        while site_pair[0] == site_pair[1]:
+            site_pair = (np.random.randint(self.wf.configuration.size), np.random.randint(self.wf.configuration.size))
+
+        # perform flips or exchanges depending on the states
+        if self.wf.configuration[site_pair[0]] != self.wf.configuration[site_pair[1]]:
+            if (self.wf.configuration[site_pair[0]] == 0) or (self.wf.configuration[site_pair[1]] == 0):
+                # |0>|1> or |0>|-1>
+                # exchange
+                return exchange2(site_pair, self.wf.configuration)
+            else:
+                # |1>|-1>
+                if np.random.uniform() < 0.5:
+                    # exchange
+                    return exchange2(site_pair, self.wf.configuration)
+                else:
+                    # switch to |0>|0>
+                    return [{'site': site_pair[0], 'old_spin': self.wf.configuration[site_pair[0]],
+                             'new_spin': 0},
+                            {'site': site_pair[1], 'old_spin': self.wf.configuration[site_pair[1]],
+                             'new_spin': 0}]
+        elif self.wf.configuration[site_pair[0]] == 0:
+            # |0>|0>
+            # switch to |1>|-1>
+            return [{'site': site_pair[0], 'old_spin': self.wf.configuration[site_pair[0]],
+                     'new_spin': 1},
+                    {'site': site_pair[1], 'old_spin': self.wf.configuration[site_pair[1]],
+                     'new_spin': -1}]
+        else:
+            # |1>|1> or |-1>|-1>
+            # find two nonequal flavors to exchange
+            found = False
+            while not found:
+                site_pair = (np.random.randint(self.wf.configuration.size), np.random.randint(self.wf.configuration.size))
+                found = (self.wf.configuration[site_pair[0]] != self.wf.configuration[site_pair[1]])
+
+            return exchange2(site_pair, self.wf.configuration)
 
     def propose_move(self, move_type='permutation', num_sites=2):
         if move_type == 'permutation':
             return self.propose_permutation()
         elif move_type == 'spin flip':
-            return self.propose_flip(num_sites)
+            return self.propose_flip()
         else:
             raise ValueError("Monte Carlo move must be a 'permutation', or a 'spin flip'")
 
     def step(self):
-        flip_list = self.propose_move()
+        if self.su3:
+            flip_list = self.propose_move('permutation')
+        else:
+            flip_list = self.propose_move('spin flip')
+
         p_accept = self.wf.psi_over_psi(flip_list)
         if np.abs(p_accept)*np.abs(p_accept) > np.random.uniform():
             self.wf.update(flip_list)

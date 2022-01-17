@@ -21,7 +21,6 @@ def list_spm_smp(site_pair, configuration, spinmax):
     return fliplist_list
 
 
-
 def exchange3(site_triple, configuration):
     return [{'site': site_triple[0], 'old_spin': configuration[site_triple[0]], 'new_spin': configuration[site_triple[2]]},
             {'site': site_triple[1], 'old_spin': configuration[site_triple[1]], 'new_spin': configuration[site_triple[0]]},
@@ -93,14 +92,28 @@ class ThreeRingExchange(LocalOperator):
         return [exchange3((self.site_list[0], self.site_list[1], self.site_list[2]), configuration)], 1.0
 
 
-class Hamiltonian:
+class Observable:
 
-    def __init__(self):
+    # an observable is essentially a sum of interaction terms
+
+    def __init__(self, name):
         self.term_dict = {}
         self.coupling_dict = {}
-        self.name = 'Hamiltonian'
+        self.name = name
 
-    def add_term(self, name, coupling, neighbor_tuples, interaction_type=BilinearExchange):
+    def add_term(self):
+        pass
+
+    def local_eval(self, wf):
+        pass
+
+
+class Hamiltonian(Observable):
+
+    def __init__(self):
+        Observable.__init__(self, name='Hamiltonian')
+
+    def add_term(self, name=None, coupling=1.0, neighbor_tuples=None, interaction_type=BilinearExchange):
         if name in self.term_dict.keys():
             raise RuntimeWarning('Tried to add ' + name + ' terms to Hamiltonian multiple times!')
 
