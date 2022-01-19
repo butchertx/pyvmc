@@ -17,9 +17,9 @@ def default_sr():
 
 if __name__ == '__main__':
     lattice_run = run_mc.create_lattice()
-    wavefunction_run = run_mc.create_wavefunction(lattice_run, 'afq3')
+    wavefunction_run = run_mc.create_wavefunction(lattice_run, 'afm120')
     ham_run = run_mc.create_hamiltonian(lattice_run)
-    mc = montecarlo.VariationalMonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), sr_object=default_sr())
+    mc = montecarlo.VariationalMonteCarlo(wavefunction_run, lattice_run.get_neighbor_pairs(0), {"su3": False}, sr_object=default_sr())
     mc.add_observable(ham_run)
     results, per_site, measurements = mc.run()
     print(per_site)
